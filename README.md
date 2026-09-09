@@ -1,6 +1,6 @@
 # Cynthia Abbate
 
-Estudiante de Ingeniería en Sistemas de Información (4° año) en UTN FRBA. Trabajo en el equipo de marketing ejecutivo de una aerolínea, doy clases a nivel universitario, y llevo adelante mi propia marca de indumentaria técnica de trekking y montañismo.
+Estudiante de Ingeniería en Sistemas de Información (4° año) en UTN FRBA. Trabajo como desarrollador Web y doy clases a nivel universitario.
 
 Me interesa el desarrollo de software aplicado a problemas concretos — desde microservicios hasta interfaces interactivas — y el diseño de producto centrado en el usuario.
 
