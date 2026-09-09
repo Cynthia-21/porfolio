@@ -10,7 +10,7 @@ Me interesa el desarrollo de software aplicado a problemas concretos — desde m
 Simulador interactivo del proceso de industrialización de la leche, con panel de control docente y participación en vivo del curso.
 `JavaScript` `HTML`
 
-### 🏥 [Sweet Medical](https://github.com/Cynthia-21/sweet-medical)
+### 🏥 [Sweet Medical](https://github.com/Cynthia-21/porfolio/tree/main/sweet-medical)
 Sistema de gestión de turnos médicos, con backend en Express/MongoDB, frontend en Next.js y tests E2E con Cypress.
 `Node.js` `Express` `MongoDB` `Next.js`
 
