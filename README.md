@@ -14,7 +14,7 @@ Simulador interactivo del proceso de industrialización de la leche, con panel d
 Sistema de gestión de turnos médicos, con backend en Express/MongoDB, frontend en Next.js y tests E2E con Cypress.
 `Node.js` `Express` `MongoDB` `Next.js`
 
-### 💬 [Teamder (MatchPoint)](https://github.com/Cynthia-21/tp-teamder](https://github.com/Cynthia-21/porfolio/tree/main/tp-teamder)
+### 💬 [Teamder (MatchPoint)](https://github.com/Cynthia-21/porfolio/tree/main/tp-teamder)
 Diseño UX/UI de una app estilo Tinder para encontrar compañeros de trabajos prácticos en la facultad. Diseñé notificaciones, chats y gestión de grupos.
 `Figma` `UX/UI Design`
 
