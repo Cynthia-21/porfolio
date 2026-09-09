@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planta Láctea</title>
+<style>
+  :root{
+    --bg:#101315; --panel:#171b1f; --panel2:#141819; --fg:#e9ecef; --muted:#8b959d; --dim:#5d6a73;
+    --accent:#94bce3; --warn:#f0a83c; --ok:#5cb874; --crit:#e8574a; --line:rgba(148,188,227,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  input,textarea{font-family:inherit;font-size:15px}
+  .mono{font-family:ui-monospace,Menlo,monospace}
+  .wrap{max-width:920px;margin:0 auto;padding:22px 16px 60px}
+  .narrow{max-width:400px;margin:0 auto;padding:26px 18px}
+  .card{position:relative;border:1px solid var(--line);background:var(--panel);padding:16px}
+  .label{font:700 10px/1 -apple-system,sans-serif;letter-spacing:.18em;color:#6b8ba8;text-transform:uppercase}
+  .btn{border:0;padding:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;min-height:48px;width:100%}
+  .btn-accent{background:var(--accent);color:#101315}
+  .btn-warn{background:var(--warn);color:#101315}
+  .btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+  .btn-ghost:hover,.btn-accent:hover{filter:brightness(1.1)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;gap:8px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line)}
+  .grid3>div{background:var(--panel2);padding:9px}
+  .field{width:100%;background:#0c0f11;border:1px solid var(--line);color:var(--fg);padding:12px;border-radius:0}
+  .field:focus{outline:none;border-color:var(--accent)}
+  .list-row{display:flex;align-items:center;gap:10px;background:var(--panel2);padding:9px 11px;border-bottom:1px solid rgba(148,188,227,.08)}
+  a{color:var(--accent)}
+  .back{background:none;border:0;color:#6b8ba8;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:6px 0}
+  .err{margin-top:12px;border:1px solid rgba(240,168,60,.45);background:rgba(240,168,60,.08);padding:11px 12px}
+  .err b{color:var(--warn);text-transform:uppercase;font-size:12px;letter-spacing:.08em}
+  .stage-strip{display:flex;flex-wrap:wrap;gap:0}
+  .stage-cell{flex:1 1 100px;border:1px solid var(--line);border-left:none;padding:10px;text-align:left}
+  .stage-cell:first-child{border-left:1px solid var(--line)}
+  .h1{font-weight:800;font-size:clamp(28px,5vw,46px);line-height:1.05;text-transform:uppercase;letter-spacing:-.01em;margin:0}
+  .h2{font-weight:800;font-size:26px;line-height:1.05;text-transform:uppercase;margin:0 0 4px}
+  .pill{display:inline-block;width:8px;height:8px;flex:none}
+  .toplink{display:flex;align-items:center;gap:8px;font-size:11px;color:#6b8ba8;margin-top:16px}
+  .badge{border:1px solid var(--line);color:var(--muted);padding:4px 9px;font:600 11px/1 ui-monospace,monospace}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ================= DATOS DEL PROCESO ================= */
+const STAGES = [
+  { name:"Recepción de leche cruda", ficha:"Ingreso del camión cisterna. Se toma muestra por tanque: temperatura de llegada, acidez, prueba de alcohol, antibióticos y recuento de células somáticas. La leche que pasa se descarga a silo.",
+    temp:[4,6,5.1,"°C"], ph:[6.6,6.8,6.72], tiempo:[0,45,20,"min"] },
+  { name:"Enfriamiento", ficha:"Intercambiador de placas que baja la leche a 4 °C y silos refrigerados. El frío no elimina bacterias: solo frena su multiplicación hasta el tratamiento térmico.",
+    temp:[3,5,4.1,"°C"], ph:[6.6,6.8,6.7], tiempo:[0,120,60,"min"] },
+  { name:"Estandarización", ficha:"Centrífuga descremadora que separa crema y ajusta la materia grasa al valor de rótulo (3,0% entera). La separación es eficiente entre 45 y 55 °C.",
+    temp:[45,55,50.2,"°C"], ph:[6.6,6.8,6.7], tiempo:[0,20,8,"min"] },
+  { name:"Pasteurización", ficha:"HTST: 72–75 °C durante 15 segundos en el tubo de retención. Es la barrera sanitaria del proceso. Se controla con la prueba de fosfatasa alcalina, que debe dar negativa.",
+    temp:[72,75,73.1,"°C"], ph:[6.6,6.8,6.68], tiempo:[15,20,15.4,"s"] },
+  { name:"Homogeneización", ficha:"La leche pasa a 180–200 bar por una válvula que reduce los glóbulos de grasa a menos de 1 µm, para que no se forme capa de crema. Se hace en caliente, a 60–65 °C.",
+    temp:[60,65,62.4,"°C"], ph:[6.6,6.8,6.68], tiempo:[0,10,4,"s"] },
+  { name:"Envasado", ficha:"Llenado en envase estéril bajo condiciones asépticas, con la leche ya enfriada a 4 °C. Todo recontaminado acá vuelve inútil la pasteurización.",
+    temp:[3,5,4.2,"°C"], ph:[6.6,6.8,6.68], tiempo:[0,15,6,"min"] },
+  { name:"Distribución", ficha:"Cámara y transporte refrigerado entre 2 y 6 °C hasta el punto de venta. La vida útil declarada supone que esa cadena de frío no se corta.",
+    temp:[2,6,4.4,"°C"], ph:[6.6,6.8,6.68], tiempo:[0,72,24,"h"] }
+];
+const THEORY = [
+  { in:"Camión cisterna", out:"Silo de crudo", note:"Se muestrea cada tanque antes de descargar: acidez, prueba de alcohol, antibióticos y células somáticas." },
+  { in:"Silo de crudo", out:"Silo refrigerado", note:"Intercambiador de placas que baja la leche a 4 °C. El frío no mata bacterias: solo frena su multiplicación." },
+  { in:"Silo refrigerado", out:"Leche + crema", note:"Centrífuga descremadora: separa la crema y devuelve la parte necesaria para dejar la materia grasa en el valor de rótulo." },
+  { in:"Leche estandarizada", out:"Leche pasteurizada", note:"72–75 °C durante 15 s. Única barrera sanitaria del proceso; se verifica con fosfatasa alcalina negativa." },
+  { in:"Leche pasteurizada", out:"Emulsión estable", note:"180–200 bar rompen los glóbulos de grasa por debajo de 1 µm para que no se separe capa de crema." },
+  { in:"Leche homogeneizada", out:"Envase cerrado", note:"Llenado en envase estéril, en frío y en ambiente aséptico. Recontaminar acá anula la pasteurización." },
+  { in:"Pallet en cámara", out:"Punto de venta", note:"Cámara y transporte entre 2 y 6 °C. La vida útil impresa supone que esa cadena de frío no se corta." }
+];
+const RISK = {
+  1:{label:"BAJO RIESGO",color:"#5cb874",note:"Sustancia de uso alimentario según la cantidad."},
+  2:{label:"ALTERA LA LECHE",color:"#e0c94a",note:"Puede alterar la leche y provocar molestias si se consume en exceso."},
+  3:{label:"NO CORRESPONDE",color:"#ef9440",note:"No corresponde agregarla a leche de consumo."},
+  4:{label:"NO CONSUMIR",color:"#e8574a",note:"Sustancia potencialmente peligrosa. No consumir."}
+};
+const SUBSTANCES = [
+  { id:"bicarbonato", name:"Bicarbonato de sodio", form:"NaHCO₃", risk:3, ph:8.2, blocks:false,
+    causa:"Aumenta el pH y disminuye su acidez.", resultado:"Leche con mayor alcalinidad y composición alterada.",
+    consumo:"En cantidad elevada: náuseas, vómitos, dolor abdominal y alteraciones del equilibrio ácido-base.", nota:"Enmascara acidez: es una adulteración." },
+  { id:"citrico", name:"Ácido cítrico", form:"C₆H₈O₇", risk:3, ph:4.6, blocks:true,
+    causa:"Disminuye el pH y desestabiliza las caseínas.", resultado:"Coagulación de la leche.",
+    consumo:"En cantidad elevada puede irritar el aparato digestivo.", nota:"No corresponde agregarlo arbitrariamente a leche fluida." },
+  { id:"vinagre", name:"Vinagre / ácido acético", form:"CH₃COOH", risk:2, ph:4.3, blocks:true,
+    causa:"Disminuye rápidamente el pH.", resultado:"Caseína coagulada + suero.",
+    consumo:"Una concentración elevada puede irritar boca, garganta y estómago.", nota:"" },
+  { id:"almidon", name:"Almidón", form:"(C₆H₁₀O₅)ₙ", risk:2, ph:null, blocks:false,
+    causa:"Aumenta su viscosidad, especialmente al calentarse.", resultado:"Apariencia similar a una crema.",
+    consumo:"En cantidad elevada produce pesadez o molestias digestivas.", nota:"Simular sólidos con almidón es una adulteración clásica." },
+  { id:"gelatina", name:"Gelatina", form:"", risk:2, ph:null, blocks:false,
+    causa:"Aumenta la viscosidad y puede gelificar al enfriarse.", resultado:"Textura tipo gel / crema.",
+    consumo:"En exceso puede provocar malestar digestivo o distensión.", nota:"" },
+  { id:"sal", name:"Sal (cloruro de sodio)", form:"NaCl", risk:2, ph:null, blocks:false,
+    causa:"Modifica la concentración de sales y el equilibrio iónico.", resultado:"Modificación del sabor.",
+    consumo:"En exceso aumenta mucho la ingesta de sodio: sed, náuseas, vómitos.", nota:"" },
+  { id:"azucar", name:"Azúcar / sacarosa", form:"C₁₂H₂₂O₁₁", risk:1, ph:null, blocks:false,
+    causa:"Se disuelve y aumenta los sólidos disueltos.", resultado:"Leche más dulce y con mayor concentración de sólidos.",
+    consumo:"En cantidad muy elevada, molestias gastrointestinales y mayor carga calórica.", nota:"" },
+  { id:"lactasa", name:"Lactasa", form:"enzima", risk:1, ph:null, blocks:false,
+    causa:"Rompe la lactosa mediante hidrólisis.", resultado:"Disminución de lactosa, más glucosa y galactosa.",
+    consumo:"Es la enzima usada para producir leche sin lactosa.", nota:"Uso tecnológico legítimo en ciertos productos." },
+  { id:"cuajo", name:"Cuajo / quimosina", form:"enzima", risk:1, ph:null, blocks:true,
+    causa:"Modifica la κ-caseína y provoca coagulación.", resultado:"Cuajada + suero.",
+    consumo:"Se usa realmente en la elaboración de quesos.", nota:"Corresponde a la fabricación de queso, no a la línea de leche fluida." },
+  { id:"cultivos", name:"Cultivos de bacterias lácticas", form:"", risk:1, ph:5.1, blocks:true,
+    causa:"Las bacterias metabolizan la lactosa y producen ácido láctico.", resultado:"Disminución del pH y coagulación.",
+    consumo:"Se emplean en productos fermentados como el yogur.", nota:"Una leche fermentada sin control no equivale a un yogur." },
+  { id:"peroxido", name:"Peróxido de hidrógeno", form:"H₂O₂", risk:4, ph:null, blocks:true,
+    causa:"Puede descomponerse formando agua y oxígeno.", resultado:"Desprendimiento de oxígeno y burbujas.",
+    consumo:"No debe consumirse: puede dañar tejidos según la concentración.", nota:"NO CONSUMIR." },
+  { id:"etanol", name:"Alcohol etílico", form:"C₂H₅OH", risk:4, ph:null, blocks:true,
+    causa:"Puede desestabilizar las proteínas y favorecer su precipitación.", resultado:"Precipitación / coagulación de proteínas.",
+    consumo:"Puede provocar intoxicación, mareos y alteración de la coordinación.", nota:"No conviene realizar físicamente esta simulación: es inflamable." }
+];
+const QBANK = [
+ [ {text:"En la recepción de leche cruda se rechaza un tanque entero. ¿Qué análisis se le hacen a la muestra antes de descargar y por qué alcanza uno solo para rechazarlo?",
+    keys:["acidez","alcohol","antibiótic","células somáticas","rechaz","silo","contamin"],
+    model:"Se controla temperatura, acidez, prueba de alcohol, antibióticos y células somáticas. Alcanza un resultado fuera de especificación porque ese tanque contaminaría todo el silo."},
+   {text:"Llega un camión con la leche a 12 °C en vez de 4-6 °C. ¿Qué pasó y qué consecuencia tiene?",
+    keys:["cadena de frío","cort","multiplic","psicrótrof","zona de peligro","rechaz"],
+    model:"Se cortó la cadena de frío en el transporte. Las bacterias psicrótrofas se multiplican y la vida útil del lote ya está comprometida antes de entrar a la planta."},
+   {text:"¿Qué mide en realidad la prueba de alcohol en la recepción?",
+    keys:["estabilidad","caseín","precipit","coagul","calor","térmic"],
+    model:"Estima la estabilidad térmica de las proteínas: si las caseínas precipitan con alcohol, también van a coagular al calentar la leche."} ],
+ [ {text:"El enfriamiento baja la leche a 4 °C. ¿Por qué el frío no reemplaza a la pasteurización?",
+    keys:["no mata","frena","multiplic","patógen","barrera","térmic"],
+    model:"El frío no mata bacterias, solo frena su multiplicación. La única barrera sanitaria real es el tratamiento térmico."},
+   {text:"¿Qué son las bacterias psicrótrofas y por qué preocupan aunque después haya pasteurización?",
+    keys:["pseudomonas","lipasa","proteasa","termorresist","rancio","enzim"],
+    model:"Crecen en frío y liberan enzimas termorresistentes que sobreviven a la pasteurización, generando sabor rancio días después."},
+   {text:"¿Por qué se usa un intercambiador de placas y no una cámara para enfriar?",
+    keys:["interc","placa","rápid","superficie","continu"],
+    model:"Enfría de forma continua y muy rápida por su gran superficie de contacto; una cámara tardaría horas, tiempo de multiplicación bacteriana."} ],
+ [ {text:"¿Cómo se ajusta la materia grasa al valor de rótulo y qué pasa si queda por encima?",
+    keys:["centríf","descrem","crema","rótulo","especific","materia grasa"],
+    model:"Una centrífuga separa la crema y se devuelve la proporción necesaria. Si queda por encima, el producto sale fuera de la especificación legal."},
+   {text:"¿Por qué la descremadora necesita la leche entre 45 y 55 °C?",
+    keys:["grasa","fluye","fund","separac","cristaliz"],
+    model:"A esa temperatura la grasa está fundida y fluye; en frío la separación queda incompleta."},
+   {text:"¿Qué se hace con la crema separada y por qué importa para la planta?",
+    keys:["crema","manteca","subproduct","rendimiento"],
+    model:"Parte se devuelve para estandarizar y el resto va a otros productos como crema o manteca: define el rendimiento económico de la línea."} ],
+ [ {text:"¿Qué es el binomio HTST y qué pasa si se cumple la temperatura pero no el tiempo?",
+    keys:["72","75","15","binomio","letalidad","fosfatasa","patógen"],
+    model:"HTST es 72-75 °C por 15 s. Con menos tiempo la letalidad acumulada no llega a 5 log y pueden sobrevivir patógenos."},
+   {text:"¿Qué microorganismos elimina la pasteurización y cuál se usa de referencia para fijar el binomio?",
+    keys:["listeria","salmonella","coli","coxiella","patógen"],
+    model:"Elimina Listeria, Salmonella, E. coli, entre otros; el binomio se fijó tomando a Coxiella burnetii, el más termorresistente, como referencia."},
+   {text:"¿Para qué sirve la prueba de fosfatasa alcalina?",
+    keys:["fosfatasa","negativ","enzim","verific","72"],
+    model:"Verifica que la pasteurización se hizo bien: es una enzima natural que se destruye apenas por encima del binomio; negativa confirma tratamiento suficiente."} ],
+ [ {text:"¿Qué le hace la homogeneización a la leche y qué defecto evita en el envase?",
+    keys:["glóbulo","grasa","1 µm","emulsión","capa","crema"],
+    model:"Reduce los glóbulos de grasa por debajo de 1 µm, evitando que se forme capa de crema en el envase."},
+   {text:"¿Por qué la homogeneización se hace a 60-65 °C y no en frío?",
+    keys:["fund","cristaliz","grasa","agregado","sediment"],
+    model:"A esa temperatura la grasa está fundida; en frío está cristalizada, se forman agregados y aparece sedimento."},
+   {text:"Si baja la presión del homogeneizador, ¿el problema es sanitario o de calidad?",
+    keys:["calidad","no sanitari","crema","inocu"],
+    model:"Es un defecto de calidad: la leche sigue siendo inocua porque ya pasó la barrera térmica, pero aparece capa de crema."} ],
+ [ {text:"La leche ya está pasteurizada. ¿Por qué el envasado sigue siendo un punto crítico?",
+    keys:["recontamin","asépt","estéril","anula"],
+    model:"Toda contaminación en el llenado ocurre después de la barrera térmica y no hay tratamiento posterior que la corrija."},
+   {text:"¿Por qué la leche debe estar a 4 °C en el momento de envasar?",
+    keys:["frío","multiplic","4","cámara"],
+    model:"Si entra tibia tarda horas en enfriarse en cámara, y ese tiempo es multiplicación bacteriana dentro del envase ya cerrado."},
+   {text:"¿Qué información queda registrada en el envase y para qué sirve?",
+    keys:["lote","fecha","vencimiento","trazab","retir"],
+    model:"El lote y la fecha de vencimiento permiten, ante un reclamo, retirar exactamente ese lote y revisar sus registros."} ],
+ [ {text:"¿Por qué la vida útil impresa depende de la distribución y no solo de la planta?",
+    keys:["cadena de frío","transport","supone","punto de venta"],
+    model:"La vida útil se calcula suponiendo 2-6 °C hasta el punto de venta; si se corta la cadena de frío, la fecha deja de estar respaldada."},
+   {text:"Un lote llega al punto de venta a 10 °C, sin estar vencido. ¿Se puede vender igual?",
+    keys:["no","psicrótrof","multiplic","riesgo"],
+    model:"No sin más: por encima de 6 °C las psicrótrofas se multiplicaron y el producto puede deteriorarse antes del vencimiento impreso."},
+   {text:"¿Por qué la distribución también forma parte de la trazabilidad?",
+    keys:["lote","registro","destino","retir"],
+    model:"Sin el registro de a qué puntos de venta llegó cada lote, no se puede retirarlo del mercado si aparece un problema."} ]
+];
+const OWNERS=["Morena Sánchez","Vanina Guevara","Jeremías Valdiviezo","Nara Farfán"];
+const MATES=["Juanita Juárez","Josefina Fabbroni","Luca Banega","Mauricio Paredes","Francisco López","Valentina Herrera","Tiara Cabana","Jocelyn Burgos","Sofía Chire","Lucia Tejerina","Victoria Cussi","Luciana Armella","Bárbara Garzón","Alfonsina Mateos","María Cruz","Angelina Albertini"];
+const TEACHER="Jorge Ramos";
+const ROSTER=OWNERS.concat(MATES);
+const ACCESS_CODE="lacteos-2026";
+const FAULTS=["energia","sensor","presion","cip","frio"];
+
+function pad(n){return n<10?"0"+n:""+n}
+function pad4(n){return String(n).slice(-4)}
+function hhmmss(ts){const d=new Date(ts);return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())}
+function num(v){return Math.round(v*10)/10}
+function esc(s){return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function subById(id){return SUBSTANCES.find(s=>s.id===id)||null}
+
+function analyzeSubstance(si,sub){
+  const st=STAGES[si];
+  const head="Se detectó "+sub.name.toLowerCase()+" en la línea durante "+st.name.toLowerCase()+". ";
+  let title=sub.name;
+  if(sub.risk===4) title="Sustancia no apta en la línea";
+  else if(sub.blocks) title="Coagulación: lote bloqueado";
+  else if(sub.risk===3) title="Adulteración detectada";
+  else title="Composición modificada";
+  let body=sub.causa+" "+sub.resultado;
+  if(sub.ph!=null) body+=" El pH medido pasa a "+String(sub.ph).replace(".",",")+", fuera del rango normal (6,6-6,8).";
+  if(sub.blocks) body+=" La leche coagulada tapona el equipo: el lote queda bloqueado hasta purgar y limpiar.";
+  if(sub.risk>=3) body+=" "+(sub.nota||RISK[sub.risk].note);
+  return {title,text:head+body,level:sub.risk>=3||sub.blocks?"crit":"warn"};
+}
+function analyzeVar(si,varId,value){
+  const st=STAGES[si],t=varId==="temp",ph=varId==="ph";
+  const unit=t?"°C":ph?"":st.tiempo[3];
+  const head=(t?"Temperatura ajustada a ":ph?"pH ajustado a ":"Tiempo de exposición ajustado a ")+value+(t?" °C":ph?"":" "+unit)+" durante "+st.name.toLowerCase()+". ";
+  let title="Parámetro dentro de rango",level="ok",text=head+"El valor cae dentro del rango nominal; no se esperan desvíos.";
+  if(t){
+    if(si===3){
+      if(value<63){title="Pasteurización anulada";level="crit";text=head+"El binomio tiempo-temperatura no alcanza ninguna letalidad válida: sobreviven patógenos como Salmonella o Listeria. El lote es leche cruda envasada.";}
+      else if(value<72){title="Letalidad térmica insuficiente";level="crit";text=head+"Por debajo de 72 °C el tratamiento podría no eliminar patógenos. La fosfatasa daría positiva.";}
+      else if(value<=75){title="Pasteurización conforme";level="ok";text=head+"Dentro del binomio HTST de 72-75 °C por 15 s.";}
+      else if(value<=85){title="Sobretratamiento térmico";level="warn";text=head+"Sabor a cocido, desnaturalización del suero y mayor incrustación del equipo.";}
+      else {title="Daño térmico severo";level="crit";text=head+"Reacción de Maillard, color amarillento y fouling severo con caída de caudal.";}
+    } else if(si===0||si===1||si===5||si===6){
+      if(value<=6){title="Cadena de frío conforme";level="ok";text=head+"Se mantiene por debajo de 6 °C, sin compromiso de vida útil.";}
+      else if(value<=10){title="Cadena de frío comprometida";level="warn";text=head+"Se activan psicrótrofas que sobreviven a la pasteurización posterior y generan sabor rancio.";}
+      else if(value<=20){title="Zona de peligro microbiológico";level="crit";text=head+"La carga bacteriana puede duplicarse cada 20-30 minutos.";}
+      else {title="Pérdida total de refrigeración";level="crit";text=head+"Crecimiento explosivo de mesófilos; lote perdido y CIP completo antes de retomar.";}
+    } else if(si===2){
+      if(value<40){title="Separación centrífuga deficiente";level="warn";text=head+"La descremadora necesita 45-55 °C; la materia grasa queda por encima del valor de rótulo.";}
+      else if(value<=55){title="Estandarización conforme";level="ok";text=head+"Rango correcto de descremado.";}
+      else {title="Riesgo de daño a la crema";level="warn";text=head+"Se desestabiliza la membrana del glóbulo graso antes de homogeneizar.";}
+    } else if(si===4){
+      if(value<55){title="Homogeneización en frío";level="warn";text=head+"La grasa está cristalizada: la válvula no reduce los glóbulos y aparece capa de crema.";}
+      else if(value<=65){title="Homogeneización conforme";level="ok";text=head+"Temperatura correcta para una emulsión estable.";}
+      else {title="Fuera de ventana térmica";level="warn";text=head+"Sube el riesgo de coagulación en el cabezal.";}
+    }
+  }
+  if(ph){
+    if(value<6.3){title="Acidez elevada: leche inestable";level="crit";text=head+"Fermentación láctica avanzada; coagula en el intercambiador y tapona el equipo.";}
+    else if(value<6.6){title="Acidez por encima de lo normal";level="warn";text=head+"Aumenta el riesgo de precipitación de caseínas al calentar.";}
+    else if(value<=6.8){title="pH conforme";level="ok";text=head+"Rango normal de leche fresca de vaca.";}
+    else if(value<=7.2){title="pH alcalino: sospecha de mastitis";level="warn";text=head+"Hay que segregar el tanque y revisar el origen.";}
+    else {title="Alcalinidad anómala: posible adulteración";level="crit";text=head+"Sugiere neutralizantes agregados o restos de solución de limpieza.";}
+  }
+  if(varId==="tiempo"){
+    if(si===3){
+      if(value<15){title="Retención insuficiente";level="crit";text=head+"El tubo exige 15 s a 72 °C; con menos tiempo la letalidad no alcanza.";}
+      else if(value<=25){title="Retención conforme";level="ok";text=head+"Cumple el binomio HTST.";}
+      else {title="Retención excesiva";level="warn";text=head+"Sabor a cocido y mayor incrustación del equipo.";}
+    } else if(value>st.tiempo[1]){title="Tiempo fuera de rango";level="warn";text=head+"Prolongarlo desajusta el caudal de toda la línea.";}
+  }
+  return {title,text,level};
+}
+function analyzeFault(si,fault){
+  const st=STAGES[si],name=st.name.toLowerCase();
+  const M={
+    energia:{title:"Corte de energía",level:"crit",text:"Se cortó la energía durante "+name+". Si es pasteurización, la leche no tratada debe desviarse al retorno; si es refrigeración, la temperatura sube y arranca el desarrollo de psicrótrofos."},
+    sensor:{title:"Sensor fuera de rango",level:"warn",text:"La sonda de "+name+" no coincide con la testigo. El control automático trabaja sobre un dato falso: puede estar subpasteurizando sin que se note."},
+    presion:{title:"Presión anómala",level:"warn",text:"La presión en "+name+" está fuera de rango. Se altera el caudal y con él el tiempo real de permanencia en cada equipo."},
+    cip:{title:"Limpieza CIP incompleta",level:"crit",text:"El ciclo de limpieza de "+name+" quedó incompleto: quedan biofilms que resiembran cada lote siguiente. Hay que repetir el CIP completo."},
+    frio:{title:"Falla en torre de frío",level:"crit",text:"El agua helada que alimenta "+name+" perdió capacidad; el problema se propaga en cascada a toda la línea."}
+  };
+  return M[fault]||M.sensor;
+}
+function analyzeState(si,overrides,lastFault){
+  const st=STAGES[si],devs=[];
+  Object.keys(overrides||{}).forEach(k=>{
+    const p=k.split(":");if(+p[0]!==si)return;
+    const vid=p[1],v=overrides[k],rng=st[vid];
+    if(v<rng[0]||v>rng[1])devs.push({vid,v});
+  });
+  if(devs.length){const d=devs[0];const a=analyzeVar(si,d.vid,d.v);return{title:a.title,text:"Evaluación del estado actual. "+a.text,level:a.level};}
+  if(lastFault){const a=analyzeFault(si,lastFault);return{title:"Anomalía sin resolver",text:"La etapa opera en rango, pero la anomalía anterior sigue sin cerrarse. "+a.text,level:"warn"};}
+  return {title:"Proceso bajo control",level:"ok",text:"Todas las variables de "+st.name.toLowerCase()+" están dentro del rango nominal. Sin desvíos activos; el lote es apto para avanzar."};
+}
+function buildQuestion(si,ev){
+  const st=STAGES[si],name=st.name.toLowerCase();
+  if(ev&&ev.kind==="sub"){
+    const sub=subById(ev.subId);
+    if(sub) return {text:"Se agregó "+sub.name.toLowerCase()+" a la línea durante "+name+". ¿Qué le hace esa sustancia a la leche y por qué el lote queda o no queda apto?",
+      keys:["ph","caseín","coagul","proteín","viscos","adulter","apto","sodio","riesgo"],
+      model:sub.causa+" "+sub.resultado+" "+(sub.blocks?"Con la leche coagulada la línea se tapona y el lote queda bloqueado hasta el CIP.":"El lote no se bloquea, pero su composición ya no es la declarada.")+" "+RISK[sub.risk].note};
+  }
+  if(ev&&ev.kind==="fault") return {text:"Se produjo la anomalía \""+ev.fault+"\" durante "+name+". ¿Qué efecto tiene sobre el producto y qué debería hacer el operador?",
+    keys:["desví","frío","refriger","temperatura","purgar","bloque","control"], model:analyzeFault(si,ev.fault).text};
+  if(ev&&ev.kind==="var"&&ev.varId==="ph") return {text:"El pH quedó en "+String(ev.value).replace(".",",")+" durante "+name+". ¿Qué le pasa a las proteínas y qué riesgo hay al calentarla?",
+    keys:["caseín","coagul","precipit","interc","acidez","6,6","6,8"], model:analyzeVar(si,"ph",ev.value).text};
+  return {text:"La temperatura de "+name+" quedó en "+(ev?ev.value:"un valor alterado")+" °C. ¿Qué le pasa a la leche a esa temperatura?",
+    keys:["patógen","temperatura","riesgo","calidad","rango"], model:analyzeVar(si,"temp",ev?ev.value:st.temp[2]).text};
+}
+function gradeAnswer(ans,q){
+  const norm=String(ans||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const hits=(q.keys||[]).filter(k=>norm.indexOf(k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""))>=0);
+  const words=norm.split(/\s+/).filter(w=>w.length>2).length;
+  let veredicto,level,head;
+  if(hits.length>=3){veredicto="RESPUESTA CORRECTA";level="ok";head="La respuesta identifica los puntos centrales del caso. ";}
+  else if(hits.length>=1){veredicto="RESPUESTA PARCIAL";level="warn";head="Va en la dirección correcta pero deja afuera parte del razonamiento. ";}
+  else if(words>=3){veredicto="RESPUESTA INCOMPLETA";level="warn";head="No llega al punto técnico del caso. ";}
+  else {veredicto="SIN DESARROLLO";level="warn";head="No hay desarrollo suficiente para evaluar. ";}
+  return {veredicto,level,text:head+"Completo: "+q.model};
+}
+function buildRound(si,ev,students){
+  const order=[si];for(let k=1;k<STAGES.length;k++)order.push((si+k)%STAGES.length);
+  return students.map((name,i)=>{
+    const stage=order[i%STAGES.length],lap=Math.floor(i/STAGES.length);
+    let q;
+    if(i===0&&ev) q=buildQuestion(si,ev);
+    else {const bank=QBANK[stage];q=bank[lap%bank.length];}
+    return {student:name,stage,text:q.text,keys:q.keys,model:q.model,answer:null,feedback:null};
+  });
+}
+function roomCodeFor(room){
+  const src="planta-"+room;let h=7;
+  for(let i=0;i<src.length;i++)h=(h*31+src.charCodeAt(i))%100000;
+  return pad4(1000+(h%9000));
+}
+
+/* ================= ESTADO Y SINCRONIZACIÓN ================= */
+const EMPTY={stage:0,present:[],selected:null,selectedTs:0,analysis:null,log:[],overrides:{},lastFault:null,alarmTs:0,substance:null,substanceTs:0,blocked:null,lastEvent:null,round:null,wipedAt:0,v:0};
+const params=new URLSearchParams(location.search);
+const ROOM=(params.get("sala")||"AULA-01").toUpperCase().replace(/[^A-Z0-9-]/g,"");
+const KEY="pl-sala-"+ROOM;
+const MEKEY="pl-me-"+ROOM;
+
+let shared=EMPTY;
+let ui={screen:"welcome",gateValue:"",gateError:"",nameValue:"",nameError:"",codeValue:"",codeError:"",
+  doneName:"",doneTime:"",doneOrder:"",varSel:"temp",varInput:"",wipeArmed:false,subOpen:false,subSel:null,
+  oralInput:"",ansInput:"",qSel:null,joinValue:"",manualOpen:false,insp:null,link:"conectando",rolling:false};
+
+async function getShared(){
+  try{const r=await window.storage.get(KEY,true);return r?JSON.parse(r.value):EMPTY;}catch(e){return EMPTY;}
+}
+async function setShared(next){
+  try{await window.storage.set(KEY,JSON.stringify(next),true);return true;}catch(e){return false;}
+}
+async function getMe(){
+  try{const r=await window.storage.get(MEKEY,false);return r?JSON.parse(r.value):null;}catch(e){return null;}
+}
+async function setMe(v){try{await window.storage.set(MEKEY,JSON.stringify(v),false);}catch(e){}}
+
+async function commit(patch,logText,logKind){
+  const latest=await getShared();
+  const next=Object.assign({},latest,patch,{v:(latest.v||0)+1});
+  if(logText) next.log=[{ts:Date.now(),text:logText,kind:logKind||"info"}].concat(latest.log||[]).slice(0,40);
+  const ok=await setShared(next);
+  shared=next; ui.link=ok?"sincronizada":"error sincronizando";
+  render();
+}
+async function poll(){
+  const latest=await getShared();
+  if((latest.v||0)!==(shared.v||0)){shared=latest;render();}
+  if(ui.link!=="sincronizada") {ui.link="sincronizada";render();}
+}
+setInterval(poll,2200);
+
+/* ================= ACCIONES ================= */
+function joinRoom(code){
+  const c=String(code||"").trim().toUpperCase().replace(/[^A-Z0-9-]/g,"");
+  if(!c) return;
+  const u=new URL(location.href); u.searchParams.set("sala",c); location.href=u.toString();
+}
+async function addManual(name){
+  const present=shared.present||[];
+  if(present.some(p=>p.name===name)) return;
+  const now=Date.now();
+  await commit({present:present.concat([{name,time:hhmmss(now),ts:now}])},"Presencia agregada a mano: "+name,"ok");
+}
+async function submitGate(){
+  const v=(ui.gateValue||"").trim();
+  if(v.length<4){ui.gateError="El código tiene cuatro dígitos.";render();return;}
+  if(v!==roomCodeFor(ROOM)){ui.gateError="El código "+v+" no corresponde a esta sala.";ui.gateValue="";render();return;}
+  ui.screen="form";ui.gateValue="";ui.gateError="";render();
+}
+async function submitName(){
+  const raw=(ui.nameValue||"").trim().replace(/\s+/g," ");
+  if(!raw){ui.nameError="Ingresá tu nombre y apellido como figuran en el padrón.";render();return;}
+  const normf=x=>x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const hit=ROSTER.find(n=>normf(n)===normf(raw));
+  if(!hit){ui.nameError='"'+raw+'" no figura en el padrón. Verificá la escritura o pedile al profesor que te agregue a mano.';render();return;}
+  const present=shared.present||[];
+  const ex=present.find(p=>p.name===hit);
+  if(ex){
+    await setMe({name:hit,time:ex.time,order:pad(present.indexOf(ex)+1)});
+    ui.screen="done";ui.doneName=hit;ui.doneTime=ex.time;ui.doneOrder=pad(present.indexOf(ex)+1);ui.nameValue="";render();
+    return;
+  }
+  const time=hhmmss(Date.now());
+  const next=present.concat([{name:hit,time,ts:Date.now()}]);
+  await setMe({name:hit,time,order:pad(next.length)});
+  ui.screen="done";ui.doneName=hit;ui.doneTime=time;ui.doneOrder=pad(next.length);ui.nameValue="";
+  await commit({present:next},"Presencia registrada: "+hit+" ("+time+")","ok");
+}
+async function forgetMe(){
+  try{await window.storage.delete(MEKEY,false);}catch(e){}
+  ui.screen="scan";ui.doneName="";ui.doneTime="";ui.doneOrder="";render();
+}
+async function submitCode(){
+  const v=(ui.codeValue||"").trim().toLowerCase();
+  if(v!==ACCESS_CODE.toLowerCase()){ui.codeError="El código no coincide con ningún operador habilitado.";ui.codeValue="";render();return;}
+  ui.screen="panel";ui.codeValue="";ui.codeError="";render();
+}
+async function advance(){
+  const si=shared.stage;
+  if(shared.blocked){await commit({analysis:{title:"Avance rechazado",level:"crit",text:"La línea está bloqueada: "+shared.blocked+" Hay que purgar y ejecutar el CIP antes de retomar."},alarmTs:Date.now()},"Avance rechazado: línea bloqueada","crit");return;}
+  if(si>=STAGES.length-1){await commit({analysis:{title:"Lote completo",level:"ok",text:"La línea terminó las 7 etapas. El lote queda liberado con toda la trazabilidad registrada."}},"Línea completa. Lote liberado.","ok");return;}
+  const ns=si+1;
+  await commit({stage:ns,lastFault:null,analysis:{title:"Etapa habilitada",level:"ok",text:"Avance a "+STAGES[ns].name.toLowerCase()+". "+STAGES[ns].ficha}},"Avance de etapa → "+pad(ns+1)+" "+STAGES[ns].name,"ok");
+}
+async function fault(){
+  const si=shared.stage,st=STAGES[si];
+  const f=FAULTS[Math.floor(Math.random()*FAULTS.length)];
+  const a=analyzeFault(si,f);
+  await commit({analysis:a,lastFault:f,alarmTs:Date.now(),lastEvent:{kind:"fault",fault:f,stage:si}},"FALLA: "+a.title+" en "+st.name,"crit");
+}
+async function analyze(){
+  const si=shared.stage;
+  const asub=subById(shared.substance);
+  const a=asub?(()=>{const b=analyzeSubstance(si,asub);return{title:"Evaluación: producto contaminado",level:"crit",text:"Hay "+asub.name.toLowerCase()+" en la línea. "+b.text};})():analyzeState(si,shared.overrides,shared.lastFault);
+  await commit({analysis:a},"Análisis solicitado: "+a.title,a.level);
+}
+async function pick(){
+  const present=shared.present||[];
+  if(!present.length){await commit({analysis:{title:"Sin alumnos presentes",level:"warn",text:"No hay registros de presencia todavía."}},"Selección fallida: padrón vacío","warn");return;}
+  ui.rolling=true;render();
+  let n=0;
+  const iv=setInterval(()=>{n++;ui.rollName=ROSTER[Math.floor(Math.random()*ROSTER.length)];render();if(n>8){clearInterval(iv);}},90);
+  setTimeout(async()=>{
+    clearInterval(iv);ui.rolling=false;
+    const p=present[Math.floor(Math.random()*present.length)];
+    await commit({selected:p.name,selectedTs:Date.now()},"Operador en consola: "+p.name,"info");
+  },850);
+}
+async function setVar(){
+  const si=shared.stage,st=STAGES[si],varSel=ui.varSel,selRng=st[varSel];
+  const val=parseFloat(String(ui.varInput||"").replace(",","."));
+  if(isNaN(val)){ui.varInput="";render();return;}
+  const a=analyzeVar(si,varSel,num(val));
+  const ov=Object.assign({},shared.overrides);ov[si+":"+varSel]=num(val);
+  const label=varSel==="temp"?"Temperatura":varSel==="ph"?"pH":"Tiempo de exposición";
+  const unit=varSel==="temp"?"°C":varSel==="ph"?"":st.tiempo[3];
+  await commit({overrides:ov,analysis:a,alarmTs:a.level==="ok"?shared.alarmTs:Date.now(),lastEvent:{kind:"var",varId:varSel,value:num(val),stage:si}},label+" → "+num(val)+" "+unit+" en "+st.name,a.level);
+  ui.varInput="";render();
+}
+async function applySub(){
+  const si=shared.stage,st=STAGES[si],sub=subById(ui.subSel);
+  if(!sub) return;
+  const a=analyzeSubstance(si,sub);
+  const ov=Object.assign({},shared.overrides);
+  if(sub.ph!=null) ov[si+":ph"]=sub.ph;
+  const patch={substance:sub.id,substanceTs:Date.now(),overrides:ov,analysis:a,alarmTs:Date.now(),lastEvent:{kind:"sub",subId:sub.id,stage:si}};
+  if(sub.blocks) patch.blocked=sub.resultado+" Línea detenida en "+st.name.toLowerCase()+".";
+  await commit(patch,"SUSTANCIA: "+sub.name+" aplicada en "+st.name,sub.risk>=3||sub.blocks?"crit":"warn");
+  ui.subOpen=false;render();
+}
+async function purge(){
+  const si=shared.stage,ov=Object.assign({},shared.overrides);
+  Object.keys(ov).forEach(k=>{if(k.indexOf(si+":")===0)delete ov[k];});
+  await commit({substance:null,substanceTs:0,blocked:null,overrides:ov,lastFault:null,analysis:{title:"Línea purgada",level:"ok",text:"Se descartó el contenido de la línea y se completó el CIP. El lote queda habilitado para avanzar."}},"Línea purgada y CIP completo.","ok");
+}
+async function doWipe(){
+  if(!ui.wipeArmed){ui.wipeArmed=true;render();setTimeout(()=>{ui.wipeArmed=false;render();},5000);return;}
+  ui.wipeArmed=false;
+  await commit({present:[],selected:null,selectedTs:0,round:null,wipedAt:Date.now()},"Padrón de presentes vaciado.","warn");
+}
+async function askRound(){
+  const si=shared.stage,present=shared.present||[];
+  if(!present.length){await commit({analysis:{title:"Sin alumnos presentes",level:"warn",text:"No hay registros de presencia. Los alumnos deben ingresar el código de sala y su nombre."}},"Ronda no emitida: padrón vacío","warn");return;}
+  const names=present.map(p=>p.name);
+  for(let i=names.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[names[i],names[j]]=[names[j],names[i]];}
+  const items=buildRound(si,shared.lastEvent,names);
+  await commit({round:{ts:Date.now(),items},selected:null,selectedTs:0},items.length===1?"Ronda emitida: 1 pregunta":"Ronda emitida: "+items.length+" preguntas","info");
+  ui.qSel=names[0];render();
+}
+async function sendAnswer(student,text,by){
+  const latest=await getShared();
+  if(!latest.round) return;
+  const t=String(text||"").trim(); if(t.length<2) return;
+  let found=false;
+  const items=latest.round.items.map(it=>{if(it.student!==student)return it;found=true;return Object.assign({},it,{answer:{text:t,by,ts:Date.now()}});});
+  if(!found) return;
+  await commit({round:Object.assign({},latest.round,{items})},"Respuesta de "+student+(by==="oral"?" (registrada por el profesor)":"")+": "+(t.length>80?t.slice(0,80)+"…":t),"info");
+}
+async function gradeAll(){
+  const latest=await getShared();
+  if(!latest.round) return;
+  const items=latest.round.items.map(it=>{
+    if(!it.answer||it.feedback) return it;
+    const g=gradeAnswer(it.answer.text,it);
+    return Object.assign({},it,{feedback:{veredicto:g.veredicto,text:g.text,level:g.level,ts:Date.now()}});
+  });
+  await commit({round:Object.assign({},latest.round,{items})},"Corrección de respuestas nuevas completada.","ok");
+}
+async function clearRound(){await commit({round:null},"Ronda de participación cerrada.","info");ui.oralInput="";ui.ansInput="";render();}
+
+/* ================= RENDER ================= */
+function screenWrap(inner,narrow){
+  return '<div class="'+(narrow?'narrow':'wrap')+'" style="min-height:100vh;display:flex;flex-direction:column;justify-content:center">'+inner+'</div>';
+}
+function linkBadge(){
+  const c=ui.link==="sincronizada"?"var(--ok)":ui.link==="conectando"?"var(--warn)":"var(--crit)";
+  return '<div class="toplink"><span class="pill" style="background:'+c+'"></span>SALA '+ROOM+' · '+ui.link.toUpperCase()+'</div>';
+}
+function screenWelcome(){
+  const present=shared.present||[];
+  return screenWrap(
+    '<div class="label">PLANTA PILOTO</div>'+
+    '<h1 class="h1">Sistema de control<br>de planta láctea</h1>'+
+    '<p style="color:var(--muted);max-width:46ch;margin-top:14px">Industrialización de la leche en siete etapas. Monitoreo de variables, intervención del supervisor y análisis del proceso en vivo.</p>'+
+    '<div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:20px">'+
+      '<div><div class="label">DOCENTE A CARGO</div><div style="margin-top:6px;font-weight:700">'+TEACHER+'</div></div>'+
+      '<div><div class="label">PADRÓN DEL CURSO</div><div style="margin-top:6px;font-weight:700">'+ROSTER.length+' inscriptos</div></div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:22px">'+
+      '<div class="label" style="margin-bottom:14px">SELECCIONE PERFIL DE ACCESO</div>'+
+      '<button class="btn btn-accent" style="text-align:left;display:flex;justify-content:space-between;align-items:center" onclick="ui.screen=\'scan\';render()">Ingresar como alumno <span>→</span></button>'+
+      '<div style="height:10px"></div>'+
+      '<button class="btn btn-ghost" style="text-align:left;display:flex;justify-content:space-between;align-items:center" onclick="ui.screen=\'auth\';render()">Ingresar como profesor <span>→</span></button>'+
+      '<div style="height:10px"></div>'+
+      '<button class="btn btn-ghost" style="text-align:left" onclick="ui.screen=\'projection\';render()">Abrir pantalla proyectada</button>'+
+    '</div>'+
+    linkBadge()+
+    '<div class="row" style="margin-top:10px">'+
+      '<input class="field" placeholder="Unirse a otra sala (ej. AULA-02)" oninput="ui.joinValue=this.value" onkeydown="if(event.key===\'Enter\')joinRoom(ui.joinValue)">'+
+      '<button class="btn btn-ghost" style="width:auto;padding:0 14px" onclick="joinRoom(ui.joinValue)">Unirse</button>'+
+    '</div>'
+  );
+}
+function screenScan(){
+  return screenWrap('<button class="back" onclick="ui.screen=\'welcome\';render()">← Volver</button>'+
+    '<div class="label" style="margin-top:14px">PASO 1 DE 2 · HABILITACIÓN DE SALA</div>'+
+    '<h2 class="h2">Código de sala</h2>'+
+    '<p style="color:var(--muted)">Ingresá los cuatro dígitos que figuran en la pantalla proyectada del aula.</p>'+
+    '<div class="card">'+
+      '<div class="label" style="margin-bottom:9px">CÓDIGO DE HABILITACIÓN</div>'+
+      '<input class="field mono" style="font-size:34px;text-align:center;letter-spacing:.3em" maxlength="4" inputmode="numeric" placeholder="0000" value="'+esc(ui.gateValue)+'" oninput="this.value=this.value.replace(/\\D/g,\'\').slice(0,4);ui.gateValue=this.value" onkeydown="if(event.key===\'Enter\')submitGate()">'+
+      (ui.gateError?'<div class="err"><b>✕ Código inválido</b><div style="margin-top:5px">'+esc(ui.gateError)+'</div></div>':'')+
+      '<div style="height:12px"></div><button class="btn btn-accent" onclick="submitGate()">Habilitar registro</button>'+
+    '</div>',true);
+}
+function screenForm(){
+  return screenWrap('<button class="back" onclick="ui.screen=\'scan\';render()">← Volver</button>'+
+    '<div class="label" style="margin-top:14px">PASO 2 DE 2 · SALA HABILITADA</div>'+
+    '<h2 class="h2">Registro de presencia</h2>'+
+    '<p style="color:var(--muted)">Se valida contra el padrón del curso.</p>'+
+    '<div class="card">'+
+      '<div class="label" style="margin-bottom:7px">NOMBRE Y APELLIDO</div>'+
+      '<input class="field" placeholder="Ej. Camila Rearte" value="'+esc(ui.nameValue)+'" oninput="ui.nameValue=this.value" onkeydown="if(event.key===\'Enter\')submitName()">'+
+      (ui.nameError?'<div class="err"><b>✕ Acceso denegado</b><div style="margin-top:5px">'+esc(ui.nameError)+'</div></div>':'')+
+      '<div style="height:12px"></div><button class="btn btn-accent" onclick="submitName()">Validar y registrar</button>'+
+      '<div style="margin-top:10px;font-size:11px;color:var(--dim)" class="mono">'+ROSTER.length+' INSCRIPTOS · '+(shared.present||[]).length+' PRESENTES</div>'+
+    '</div>',true);
+}
+function screenDone(){
+  const present=shared.present||[];
+  const myWiped=ui.doneName&&!present.some(p=>p.name===ui.doneName);
+  const R=shared.round,items=R?R.items:[];
+  const myItem=ui.doneName&&!myWiped?items.find(x=>x.student===ui.doneName):null;
+  let mid='';
+  if(myWiped){
+    mid='<div class="err"><b>Registro dado de baja</b><div style="margin-top:7px">El profesor vació el padrón. Volvé a ingresar el código de sala y tu nombre.</div></div>'+
+        '<button class="btn btn-warn" style="margin-top:11px" onclick="forgetMe()">Registrarme de nuevo</button>';
+  } else if(myItem && !myItem.feedback){
+    mid='<div class="err" style="border-color:rgba(240,168,60,.6)"><b>Te toca responder</b>'+
+      '<div class="mono" style="font-size:10px;color:var(--muted);margin-top:9px">ETAPA '+pad(myItem.stage+1)+' · '+STAGES[myItem.stage].name.toUpperCase()+'</div>'+
+      '<div style="margin-top:11px">'+esc(myItem.text)+'</div>'+
+      (myItem.answer?'<div style="margin-top:11px;border-left:3px solid var(--accent);padding-left:11px;color:#c8cfd5">'+esc(myItem.answer.text)+'</div><div class="mono" style="margin-top:7px;font-size:10px;color:var(--dim)">RESPUESTA ENVIADA · ESPERANDO CORRECCIÓN</div>':
+      '<textarea class="field" rows="4" style="margin-top:11px" placeholder="Escribí tu respuesta" oninput="ui.ansInput=this.value">'+esc(ui.ansInput)+'</textarea><button class="btn btn-warn" style="margin-top:9px" onclick="sendAnswer(\''+myItem.student.replace(/'/g,"\\'")+'\',ui.ansInput,\'alumno\');ui.ansInput=\'\'">Enviar respuesta</button>')+
+      '</div>';
+  } else if(myItem && myItem.feedback){
+    const c=myItem.feedback.level==="ok"?"var(--ok)":"var(--warn)";
+    mid='<div class="card" style="border-color:'+c+'"><b style="color:'+c+'">'+myItem.feedback.veredicto+'</b><div style="margin-top:8px;color:#c8cfd5">'+esc(myItem.feedback.text)+'</div></div>';
+  }
+  return screenWrap(
+    '<div class="card" style="border-color:rgba(148,188,227,.35)">'+
+    '<div style="display:flex;align-items:center;gap:9px"><span class="pill" style="background:'+(myWiped?"var(--warn)":"var(--accent)")+'"></span><span class="label" style="color:'+(myWiped?"var(--warn)":"var(--accent)")+'">'+(myWiped?"DADO DE BAJA":"PRESENTE")+'</span></div>'+
+    '<div class="h2" style="margin-top:16px;font-size:30px">'+esc(ui.doneName)+'</div>'+
+    '<div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:16px">'+
+      '<div><div class="label">HORA DE INGRESO</div><div class="mono" style="margin-top:5px;font-size:18px">'+esc(ui.doneTime)+'</div></div>'+
+      '<div><div class="label">Nº DE REGISTRO</div><div class="mono" style="margin-top:5px;font-size:18px">'+esc(ui.doneOrder)+'</div></div>'+
+    '</div>'+
+    (mid?'<div style="margin-top:16px">'+mid+'</div>':'')+
+    (!myWiped?'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)">Quedás habilitado para ser seleccionado por el panel de control. Mantené esta pantalla abierta.</div>':'')+
+    '<div class="row" style="margin-top:16px">'+
+      '<button class="btn btn-ghost" onclick="ui.screen=\'scan\';render()">Registrar otro alumno</button>'+
+      '<button class="btn btn-ghost" style="width:auto;padding:0 14px" onclick="ui.screen=\'welcome\';render()">Inicio</button>'+
+    '</div></div>',true);
+}
+function screenAuth(){
+  return screenWrap('<button class="back" onclick="ui.screen=\'welcome\';render()">← Volver</button>'+
+    '<div class="label" style="margin-top:14px;color:var(--warn)">ÁREA RESTRINGIDA</div>'+
+    '<h2 class="h2">Acceso a supervisión</h2>'+
+    '<p style="color:var(--muted)">Ingrese el código de operador de planta.</p>'+
+    '<div class="card" style="border-color:rgba(240,168,60,.3)">'+
+      '<div class="label" style="margin-bottom:7px">CÓDIGO DE ACCESO</div>'+
+      '<input class="field mono" type="password" placeholder="••••••••••" value="'+esc(ui.codeValue)+'" oninput="ui.codeValue=this.value" onkeydown="if(event.key===\'Enter\')submitCode()">'+
+      (ui.codeError?'<div class="err"><b>✕ Código incorrecto</b><div style="margin-top:5px">'+esc(ui.codeError)+'</div></div>':'')+
+      '<div style="height:12px"></div><button class="btn btn-warn" onclick="submitCode()">Desbloquear panel</button>'+
+    '</div>',true);
+}
+function analysisCard(){
+  const an=shared.analysis;
+  const crit=an&&an.level==="crit",warn=an&&an.level==="warn";
+  const border=crit?"rgba(240,168,60,.55)":warn?"rgba(240,168,60,.35)":"var(--line)";
+  return '<div class="card" style="border-color:'+border+'">'+
+    '<div style="display:flex;justify-content:space-between"><span class="label">ÚLTIMO ANÁLISIS</span><span class="mono" style="font-size:10px;color:var(--dim)">'+(an?hhmmss(an.ts||Date.now()):"—")+'</span></div>'+
+    '<div style="margin-top:9px;font-weight:800;text-transform:uppercase;color:'+(crit||warn?"#f7bd60":"#e9ecef")+'">'+(an?esc(an.title):"Sistema en espera")+'</div>'+
+    '<div style="margin-top:7px;color:#c8cfd5">'+(an?esc(an.text):"Sin intervenciones registradas. La línea opera con los parámetros nominales de la etapa activa.")+'</div>'+
+  '</div>';
+}
+function screenPanel(){
+  const si=shared.stage,st=STAGES[si];
+  const present=shared.present||[];
+  const R=shared.round,items=R?R.items:[];
+  const nAns=items.filter(x=>x.answer).length,nFb=items.filter(x=>x.feedback).length;
+  const selItem=items.find(x=>x.student===ui.qSel)||items[0]||null;
+  const subSel=subById(ui.subSel);
+  const varSel=ui.varSel,selRng=st[varSel],selUnit=varSel==="temp"?"°C":varSel==="ph"?"":st.tiempo[3];
+
+  let html='<div class="wrap">'+
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'+
+      '<span style="font-weight:800;color:var(--warn);text-transform:uppercase">Panel de control</span>'+
+      '<span class="mono badge">SALA '+ROOM+'</span><span style="flex:1"></span>'+
+      '<button class="btn btn-ghost" style="width:auto;padding:8px 12px" onclick="ui.screen=\'welcome\';render()">Salir</button>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div style="display:flex;justify-content:space-between"><span class="label">ETAPA ACTIVA</span><span class="mono" style="font-size:11px;color:var(--dim)">'+pad(si+1)+' / 07</span></div>'+
+      '<div class="h2" style="margin-top:8px">'+st.name+'</div>'+
+      '<div class="grid3" style="margin-top:12px">'+
+        ['temp','ph','tiempo'].map(v=>{
+          const rng=st[v],val=(shared.overrides||{})[si+':'+v];
+          const shown=val!=null?val:rng[2];
+          const label=v==='temp'?'TEMPERATURA':v==='ph'?'PH':'TIEMPO';
+          const unit=v==='temp'?' °C':v==='ph'?'':' '+rng[3];
+          const nominal=v==='ph'?String(rng[0]).replace('.',',')+'–'+String(rng[1]).replace('.',','):rng[0]+'–'+rng[1]+unit;
+          return '<div><div class="label" style="font-size:9px">'+label+'</div><div class="mono" style="margin-top:4px;font-size:16px">'+shown+unit+'</div><div class="mono" style="margin-top:3px;font-size:9px;color:var(--dim)">'+nominal+'</div></div>';
+        }).join('')+
+      '</div>'+
+    '</div>'+
+    '<div class="label" style="margin:18px 0 9px">ACCIONES</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+      '<button class="btn btn-accent" style="grid-column:span 2;text-align:left" onclick="advance()">▶ Continuar proceso</button>'+
+      '<button class="btn btn-ghost" style="border-color:rgba(240,168,60,.5);color:var(--warn);text-align:left" onclick="fault()">Generar falla</button>'+
+      '<button class="btn btn-ghost" style="border-color:rgba(148,188,227,.4);text-align:left" onclick="analyze()">Analizar estado</button>'+
+      '<button class="btn btn-ghost" style="grid-column:span 2;text-align:left" onclick="pick()">Seleccionar alumno al azar</button>'+
+    '</div>'+
+    (ui.rolling?'<div class="card" style="margin-top:12px;text-align:center;color:var(--accent)">SORTEANDO… '+esc(ui.rollName||"")+'</div>':
+      shared.selected?'<div class="card" style="margin-top:12px;border-color:rgba(240,168,60,.5)"><div class="label" style="color:var(--warn)">OPERADOR EN CONSOLA</div><div class="h2" style="margin-top:8px;color:var(--warn)">'+esc(shared.selected)+'</div></div>':'')+
+    '<div class="label" style="margin:18px 0 9px">ALUMNOS PRESENTES ('+present.length+'/'+ROSTER.length+')</div>'+
+    '<div class="card" style="padding:0">'+
+      (present.length?present.map((p,i)=>'<div class="list-row"><span class="mono" style="color:var(--dim);font-size:11px">'+pad(i+1)+'</span><span style="flex:1;font-weight:700">'+esc(p.name)+'</span><span class="mono" style="font-size:11px;color:var(--accent)">'+p.time+'</span></div>').join(''):
+      '<div style="padding:14px;color:var(--dim)">Sin registros todavía.</div>')+
+    '</div>'+
+    '<button class="btn btn-ghost" style="margin-top:9px" onclick="ui.manualOpen=!ui.manualOpen;render()">'+(ui.manualOpen?'Cerrar':'Agregar presente a mano')+'</button>'+
+    (ui.manualOpen?'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:9px">'+ROSTER.filter(n=>!present.some(p=>p.name===n)).map(n=>'<button class="btn btn-ghost" style="width:auto;padding:8px 10px;font-size:12px" onclick="addManual(\''+n.replace(/'/g,"\\'")+'\')">+ '+esc(n)+'</button>').join('')+'</div>':'')+
+    '<button class="btn btn-ghost" style="margin-top:9px;color:'+(ui.wipeArmed?"var(--warn)":"var(--dim)")+'" onclick="doWipe()">'+(ui.wipeArmed?"CONFIRMAR: BORRAR PRESENTES":"Vaciar padrón de presentes")+'</button>'+
+
+    '<div class="label" style="margin:18px 0 9px">RONDA DE PARTICIPACIÓN</div>'+
+    '<button class="btn btn-accent" onclick="askRound()">'+(R?"Nueva ronda de preguntas":"Generar ronda de preguntas")+'</button>'+
+    (R?'<div class="card" style="margin-top:11px;padding:0">'+
+      '<div style="padding:10px 12px" class="mono" style="font-size:11px;color:var(--muted)">'+nAns+' respondidas · '+nFb+' corregidas · '+(items.length-nAns)+' pendientes</div>'+
+      items.map((it,i)=>{
+        const fb=it.feedback,on=selItem&&selItem.student===it.student;
+        const status=fb?fb.veredicto.replace("RESPUESTA ",""):it.answer?"RESPONDIÓ":"ESPERANDO";
+        const color=fb?(fb.level==="ok"?"var(--ok)":"var(--warn)"):it.answer?"var(--accent)":"var(--dim)";
+        return '<div class="list-row" style="cursor:pointer;background:'+(on?"rgba(148,188,227,.13)":"var(--panel2)")+'" onclick="ui.qSel=\''+it.student.replace(/'/g,"\\'")+'\';ui.oralInput=\'\';render()">'+
+          '<span class="pill" style="background:'+color+'"></span><span style="flex:1;font-weight:700">'+esc(it.student)+'</span><span class="mono" style="font-size:10px;color:'+color+'">'+status+'</span></div>';
+      }).join('')+
+      '</div>'+
+      (selItem?'<div class="card" style="margin-top:11px">'+
+        '<div style="display:flex;justify-content:space-between"><span style="font-weight:800;color:var(--warn)">'+esc(selItem.student)+'</span><span class="mono" style="font-size:10px;color:var(--dim)">'+pad(selItem.stage+1)+' '+STAGES[selItem.stage].name+'</span></div>'+
+        '<div style="margin-top:8px">'+esc(selItem.text)+'</div>'+
+        (selItem.answer?'<div style="margin-top:10px;border-left:3px solid var(--accent);padding-left:11px;color:#c8cfd5">'+esc(selItem.answer.text)+'</div>':'')+
+        '<div class="row" style="margin-top:10px">'+
+          '<input class="field" placeholder="Transcribir su respuesta oral" value="'+esc(ui.oralInput)+'" oninput="ui.oralInput=this.value" onkeydown="if(event.key===\'Enter\'){sendAnswer(\''+selItem.student.replace(/'/g,"\\'")+'\',ui.oralInput,\'oral\');ui.oralInput=\'\'}">'+
+          '<button class="btn btn-ghost" style="width:auto;padding:0 13px" onclick="sendAnswer(\''+selItem.student.replace(/'/g,"\\'")+'\',ui.oralInput,\'oral\');ui.oralInput=\'\'">Registrar</button>'+
+        '</div>'+
+        (selItem.feedback?'<div class="card" style="margin-top:11px;border-color:'+(selItem.feedback.level==="ok"?"var(--ok)":"var(--warn)")+'"><b>'+selItem.feedback.veredicto+'</b><div style="margin-top:7px;color:#c8cfd5">'+esc(selItem.feedback.text)+'</div></div>':'')+
+      '</div>':'')+
+      '<button class="btn btn-warn" style="margin-top:9px" '+(nAns-nFb===0?'disabled':'')+' onclick="gradeAll()">'+(nAns-nFb>0?"Corregir "+(nAns-nFb)+" respuestas":"Sin respuestas nuevas")+'</button>'+
+      '<button class="btn btn-ghost" style="margin-top:9px" onclick="clearRound()">Cerrar ronda</button>'
+      :'')+
+
+    (shared.blocked?'<div class="err" style="margin-top:16px;border-color:rgba(232,87,74,.6);background:rgba(232,87,74,.1)"><b style="color:var(--crit)">■ Línea bloqueada</b><div style="margin-top:6px">'+esc(shared.blocked)+'</div><button class="btn btn-accent" style="margin-top:11px" onclick="purge()">Purgar línea y ejecutar CIP</button></div>':'')+
+
+    '<div class="label" style="margin:18px 0 9px">AGREGAR SUSTANCIA A LA LÍNEA</div>'+
+    '<button class="btn btn-ghost" onclick="ui.subOpen=!ui.subOpen;render()">'+(ui.subOpen?"Cerrar catálogo":"Agregar sustancia")+'</button>'+
+    (ui.subOpen?'<div class="card" style="margin-top:9px;padding:0">'+SUBSTANCES.map(x=>{
+      const on=ui.subSel===x.id;
+      return '<div class="list-row" style="cursor:pointer;background:'+(on?"rgba(148,188,227,.16)":"var(--panel2)")+'" onclick="ui.subSel=\''+x.id+'\';render()"><span class="pill" style="background:'+RISK[x.risk].color+'"></span><span style="flex:1;font-weight:700">'+esc(x.name)+'</span><span class="mono" style="font-size:10px;color:var(--dim)">'+(x.form||"—")+'</span></div>';
+    }).join('')+'</div>'+
+    (subSel?'<div class="card" style="margin-top:9px"><div style="display:flex;gap:9px;align-items:baseline"><span class="pill" style="background:'+RISK[subSel.risk].color+'"></span><span style="font-weight:800">'+esc(subSel.name)+'</span><span style="flex:1"></span><span class="mono" style="font-size:10px;color:'+RISK[subSel.risk].color+'">'+RISK[subSel.risk].label+'</span></div><div style="margin-top:7px;color:var(--muted)">'+esc(subSel.causa)+'</div></div>':'')+
+    '<button class="btn btn-warn" style="margin-top:9px" '+(subSel?'':'disabled')+' onclick="applySub()">Aplicar sin avisar al curso</button>':'')+
+
+    '<div class="label" style="margin:18px 0 9px">MODIFICAR VARIABLE DE PROCESO</div>'+
+    '<div class="row">'+['temp','ph','tiempo'].map(v=>'<button class="btn '+(varSel===v?"btn-accent":"btn-ghost")+'" onclick="ui.varSel=\''+v+'\';ui.varInput=\'\';render()">'+(v==='temp'?"TEMP":v==='ph'?"PH":"TIEMPO")+'</button>').join('')+'</div>'+
+    '<div class="row" style="margin-top:9px">'+
+      '<input class="field mono" inputmode="decimal" placeholder="'+selRng[2]+'" value="'+esc(ui.varInput)+'" oninput="ui.varInput=this.value" onkeydown="if(event.key===\'Enter\')setVar()">'+
+      '<span class="badge" style="display:flex;align-items:center">'+selUnit+'</span>'+
+    '</div>'+
+    '<div class="mono" style="font-size:10px;color:var(--dim);margin-top:6px">RANGO NOMINAL · '+(varSel==='ph'?String(selRng[0]).replace('.',',')+'–'+String(selRng[1]).replace('.',','):selRng[0]+'–'+selRng[1]+' '+selUnit)+'</div>'+
+    '<button class="btn btn-warn" style="margin-top:9px" onclick="setVar()">Aplicar sin avisar al curso</button>'+
+
+    '<div style="margin-top:18px">'+analysisCard()+'</div>'+
+
+    '<div class="card" style="margin-top:18px">'+
+      '<div style="display:flex;justify-content:space-between"><span class="label">BITÁCORA</span></div>'+
+      '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto">'+
+        (shared.log||[]).map(e=>'<div style="display:flex;gap:9px;border-bottom:1px solid rgba(148,188,227,.09);padding-bottom:5px"><span class="mono" style="font-size:10px;color:'+(e.kind==='crit'||e.kind==='warn'?"var(--warn)":e.kind==='ok'?"var(--accent)":"var(--dim)")+'">'+hhmmss(e.ts)+'</span><span style="flex:1;font-size:13px;color:#c8cfd5">'+esc(e.text)+'</span></div>').join('')+
+      '</div>'+
+    '</div>'+
+  '</div>';
+  return html;
+}
+function screenProjection(){
+  const si=shared.stage,st=STAGES[si];
+  const present=shared.present||[];
+  const activeSub=subById(shared.substance);
+  const R=shared.round;
+  return '<div class="wrap">'+
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px">'+
+      '<span style="font-weight:800;text-transform:uppercase">Planta Láctea · Línea 01</span>'+
+      '<span class="mono badge">SALA '+ROOM+'</span><span class="mono" style="font-size:12px;color:var(--dim)">SUPERVISA '+TEACHER+'</span>'+
+      '<span style="flex:1"></span>'+
+      '<button class="btn btn-ghost" style="width:auto;padding:8px 12px" onclick="ui.screen=\'welcome\';render()">Salir</button>'+
+    '</div>'+
+    '<div class="stage-strip">'+STAGES.map((x,i)=>{
+      const active=i===si,done=i<si;
+      return '<div class="stage-cell" style="background:'+(active?"rgba(148,188,227,.13)":"var(--panel2)")+';border-color:'+(active?"rgba(148,188,227,.6)":"var(--line)")+'">'+
+        '<div class="mono" style="font-size:10px;color:var(--dim)">'+pad(i+1)+'</div>'+
+        '<div style="margin-top:6px;font-weight:800;font-size:13px;text-transform:uppercase;color:'+(active||done?"#e9ecef":"#8b959d")+'">'+x.name+'</div>'+
+        '<div class="mono" style="margin-top:6px;font-size:9px;color:'+(active?"var(--warn)":done?"var(--dim)":"#4d5760")+'">'+(active?"EN PROCESO":done?"COMPLETA":"EN ESPERA")+'</div>'+
+      '</div>';
+    }).join('')+'</div>'+
+    '<div style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">'+
+      '<div>'+analysisCard()+
+        (R?'<div class="card" style="margin-top:14px;border-color:rgba(240,168,60,.5)"><div class="label" style="color:var(--warn)">RONDA DE PREGUNTAS</div>'+
+          R.items.map((it,i)=>{const fb=it.feedback;const color=fb?(fb.level==="ok"?"var(--ok)":"var(--warn)"):it.answer?"var(--accent)":"var(--dim)";
+            return '<div class="list-row"><span class="pill" style="background:'+color+'"></span><span style="flex:1;font-weight:700">'+esc(it.student)+'</span><span class="mono" style="font-size:10px;color:var(--dim)">'+STAGES[it.stage].name+'</span></div>';}).join('')+
+        '</div>':'')+
+        (activeSub?'<div class="card" style="margin-top:14px;border-color:'+RISK[activeSub.risk].color+'"><div class="label" style="color:'+RISK[activeSub.risk].color+'">SUSTANCIA EN LA LÍNEA</div><div class="h2" style="margin-top:8px">'+esc(activeSub.name)+'</div><div style="margin-top:8px;color:var(--muted)">'+esc(activeSub.causa)+' '+esc(activeSub.resultado)+'</div></div>':'')+
+      '</div>'+
+      '<div>'+
+        '<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="label">PLANTEL PRESENTE</span><span class="mono" style="font-size:22px;color:var(--accent)">'+pad(present.length)+'</span></div>'+
+        '<div class="card" style="margin-top:11px;background:rgba(148,188,227,.07);border-color:rgba(148,188,227,.3)"><div class="label">CÓDIGO DE SALA</div><div class="mono" style="margin-top:6px;font-size:34px;letter-spacing:.1em;color:var(--accent)">'+roomCodeFor(ROOM)+'</div></div>'+
+        '<div style="margin-top:11px;max-height:220px;overflow:auto">'+(present.length?present.map((p,i)=>'<div class="list-row"><span class="mono" style="font-size:11px;color:var(--dim)">'+pad(i+1)+'</span><span style="flex:1;font-weight:700">'+esc(p.name)+'</span><span class="mono" style="font-size:11px;color:var(--accent)">'+p.time+'</span></div>').join(''):'<div style="padding:12px;color:var(--dim)">Sin registros todavía.</div>')+'</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+function render(){
+  let html='';
+  if(ui.screen==="welcome") html=screenWelcome();
+  else if(ui.screen==="scan") html=screenScan();
+  else if(ui.screen==="form") html=screenForm();
+  else if(ui.screen==="done") html=screenDone();
+  else if(ui.screen==="auth") html=screenAuth();
+  else if(ui.screen==="panel") html=screenPanel();
+  else if(ui.screen==="projection") html=screenProjection();
+  document.getElementById("app").innerHTML=html;
+}
+
+/* ================= INICIO ================= */
+(async function init(){
+  shared=await getShared();
+  const me=await getMe();
+  if(me&&me.name){ui.doneName=me.name;ui.doneTime=me.time;ui.doneOrder=me.order;}
+  ui.link="sincronizada";
+  render();
+})();
+</script>
+</body>
+</html>
