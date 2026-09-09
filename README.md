@@ -6,19 +6,15 @@ Me interesa el desarrollo de software aplicado a problemas concretos — desde m
 
 ## Proyectos
 
-### 🥛 [Control Planta Láctea](https://github.com/TU-USUARIO/control-planta-lactea)
+### 🥛 [Control Planta Láctea](https://github.com/Cynthia-21/control-planta-lactea)
 Simulador interactivo del proceso de industrialización de la leche, con panel de control docente y participación en vivo del curso.
 `JavaScript` `HTML`
 
-### 📦 [DonaTrack](https://github.com/TU-USUARIO/donatrack)
-Sistema de gestión y trazabilidad de donaciones, con arquitectura distribuida en microservicios. Trabajo Práctico Anual de Diseño de Sistemas.
-`Java` `Spring Boot` `Docker` `RabbitMQ`
-
-### 🏥 [Sweet Medical](https://github.com/TU-USUARIO/sweet-medical)
+### 🏥 [Sweet Medical](https://github.com/Cynthia-21/sweet-medical)
 Sistema de gestión de turnos médicos, con backend en Express/MongoDB, frontend en Next.js y tests E2E con Cypress.
 `Node.js` `Express` `MongoDB` `Next.js`
 
-### 💬 [Teamder (MatchPoint)](https://github.com/TU-USUARIO/tp-teamder)
+### 💬 [Teamder (MatchPoint)](https://github.com/Cynthia-21/tp-teamder)
 Diseño UX/UI de una app estilo Tinder para encontrar compañeros de trabajos prácticos en la facultad. Diseñé notificaciones, chats y gestión de grupos.
 `Figma` `UX/UI Design`
 
