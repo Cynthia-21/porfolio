@@ -6,7 +6,7 @@ Me interesa el desarrollo de software aplicado a problemas concretos — desde m
 
 ## Proyectos
 
-### 🥛 [Control Planta Láctea]([https://github.com/Cynthia-21/control-planta-lactea](https://github.com/Cynthia-21/porfolio/tree/main/control-planta-lactea))
+### 🥛 [Control Planta Láctea]((https://github.com/Cynthia-21/porfolio/tree/main/control-planta-lactea))
 Simulador interactivo del proceso de industrialización de la leche, con panel de control docente y participación en vivo del curso.
 `JavaScript` `HTML`
 
